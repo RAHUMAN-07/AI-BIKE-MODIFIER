@@ -97,6 +97,69 @@ function BikePart({
   const { parts, selectedPart, hoveredPart, selectPart, hoverPart } = useBikeStore();
   const part = parts[partId];
 
+  // Dynamic geometry modifications based on active styleVariant or replacementPart
+  const modifiedTransform = useMemo(() => {
+    let mPos = [...position] as [number, number, number];
+    let mRot = [...rotation] as [number, number, number];
+    let mScl = [...scale] as [number, number, number];
+
+    if (!part) return { position: mPos, rotation: mRot, scale: mScl };
+
+    // --- Exhaust customizations ---
+    if (partId === 'exhaust') {
+      if (part.replacementPart === 'exhaust_akra_carbon' || part.replacementPart === 'exhaust_sc_crt') {
+        // GP side slip-on muffler style
+        mPos = [0.15, -0.05, 0.16];
+        mRot = [0.15, 0, 0.38];
+        mScl = [0.75, 0.75, 1.1];
+      } else if (part.styleVariant === 'retro' || part.replacementPart === 'exhaust_yoshi') {
+        // Classic retro twin pipes style
+        mPos = [-0.1, -0.12, 0.15];
+        mRot = [0.0, 0, 0.15];
+        mScl = [1.25, 0.85, 0.85];
+      }
+    }
+
+    // --- Seat customizations ---
+    if (partId === 'seat') {
+      if (part.styleVariant === 'retro' || part.replacementPart === 'seat_saddle') {
+        // Thicker tracker/scrambler seat style
+        mPos = [-0.36, 1.055, 0];
+        mScl = [1.02, 1.45, 1.08];
+      } else if (part.styleVariant === 'cafe' || part.replacementPart === 'seat_corbin') {
+        // Sleek cafe racer solo cowl style
+        mPos = [-0.36, 1.025, 0];
+        mScl = [0.95, 0.82, 0.96];
+      }
+    }
+
+    // --- Fuel Tank customizations ---
+    if (partId === 'fuel_tank') {
+      if (part.styleVariant === 'retro' || part.replacementPart === 'tank_unit_garage') {
+        // Bulky scrambler tank style
+        mScl = [1.08, 1.08, 1.14];
+      } else if (part.styleVariant === 'cafe') {
+        // Slim vintage clubman tank style
+        mScl = [0.94, 0.88, 0.88];
+      }
+    }
+
+    // --- Handlebar customizations ---
+    if (partId === 'handlebar') {
+      if (part.replacementPart === 'bar_renthal_twn') {
+        // Wide motocross style handlebar
+        mPos = [0.92, 1.29, 0];
+        mScl = [1.0, 1.0, 1.25];
+      } else if (part.replacementPart === 'bar_drag_low') {
+        // Narrow retro flat drag bar
+        mPos = [0.92, 1.23, 0];
+        mScl = [0.85, 0.95, 0.85];
+      }
+    }
+
+    return { position: mPos, rotation: mRot, scale: mScl };
+  }, [part, partId, position, rotation, scale]);
+
   const material = useMemo(() => {
     if (!part) return new THREE.MeshPhysicalMaterial({ color: '#666' });
     return createMaterial(
@@ -129,9 +192,9 @@ function BikePart({
       ref={meshRef}
       geometry={geometry}
       material={material}
-      position={position}
-      rotation={rotation}
-      scale={scale}
+      position={modifiedTransform.position}
+      rotation={modifiedTransform.rotation}
+      scale={modifiedTransform.scale}
       onClick={handleClick}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
