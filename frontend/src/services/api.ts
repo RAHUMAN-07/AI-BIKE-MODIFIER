@@ -18,6 +18,7 @@ export interface SegmentationStatus {
   status: 'pending' | 'processing' | 'complete' | 'error';
   progress: number;
   parts?: string[];
+  colors?: Record<string, string> | null;
   error?: string;
 }
 
@@ -76,36 +77,61 @@ export async function getReconstructionStatus(sessionId: string): Promise<Recons
   return response.json();
 }
 
+// ---------- Default Model ----------
+
+export async function getDefaultModel(): Promise<{ status: string, modelUrl?: string }> {
+  const response = await fetch(`${API_BASE}/default-model`);
+  if (!response.ok) {
+    throw new Error('Failed to get default model');
+  }
+  return response.json();
+}
+
 // ---------- Segmentation (Phase 3 — stub for now) ----------
 
 export async function startSegmentation(_sessionId: string): Promise<void> {
-  // Phase 3: will call real API
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // Directly handled by getSegmentationStatus now.
+  return Promise.resolve();
 }
 
-export async function getSegmentationStatus(_sessionId: string): Promise<SegmentationStatus> {
-  // Phase 3: will call real API. For now, return mock complete.
+export async function getSegmentationStatus(sessionId: string): Promise<SegmentationStatus> {
+  const response = await fetch(`${API_BASE}/detect-parts/${sessionId}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get segmentation data from backend');
+  }
+
+  const data = await response.json();
+  
   return {
     status: 'complete',
     progress: 100,
-    parts: [
-      'fuel_tank', 'fairing', 'seat', 'exhaust', 'handlebar',
-      'mirror_left', 'mirror_right', 'headlight', 'taillight',
-      'front_wheel', 'rear_wheel', 'front_rim', 'rear_rim',
-      'mudguard_front', 'mudguard_rear', 'chain_cover', 'engine', 'frame',
-    ],
+    parts: data.parts ? data.parts.map((p: any) => p.id) : [],
+    colors: data.colors || null
   };
 }
 
 // ---------- AI Generation (Phase 4 — stub for now) ----------
 
-export async function generateModification(_request: GenerationRequest): Promise<GenerationResult[]> {
-  await new Promise(resolve => setTimeout(resolve, 2000));
+export async function generateModification(request: GenerationRequest): Promise<GenerationResult[]> {
+  const response = await fetch(`${API_BASE}/reconstruct`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: request.sessionId,
+      partId: request.partId,
+      selectedItem: request.prompt || request.parameters?.style || 'custom'
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate image from backend');
+  }
+
+  const data = await response.json();
+
   return [
-    { imageUrl: '', textureUrl: '' },
-    { imageUrl: '', textureUrl: '' },
-    { imageUrl: '', textureUrl: '' },
-    { imageUrl: '', textureUrl: '' },
+    { imageUrl: toBackendUrl(data.resultUrl) }
   ];
 }
 
@@ -121,6 +147,7 @@ export default {
   uploadImage,
   startReconstruction,
   getReconstructionStatus,
+  getDefaultModel,
   startSegmentation,
   getSegmentationStatus,
   generateModification,

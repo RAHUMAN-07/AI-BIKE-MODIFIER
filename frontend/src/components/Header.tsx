@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { useBikeStore } from '../stores/bikeStore';
 
 const STAGES = [
@@ -19,8 +20,20 @@ function getStageIndex(stage: string): number {
 }
 
 export default function Header() {
-  const { processingStage, modifications, undoLastModification, resetAll } = useBikeStore();
+  const { processingStage, modifications, undoLastModification, resetAll, loadRemoteModel } = useBikeStore();
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [showSketchfabHelper, setShowSketchfabHelper] = useState(false);
   const currentIndex = getStageIndex(processingStage);
+
+  const handleLoadRemote = useCallback(() => {
+    const url = remoteUrl.trim();
+    if (!url) return;
+    loadRemoteModel(url);
+  }, [loadRemoteModel, remoteUrl]);
+
+  const toggleSketchfabHelper = useCallback(() => {
+    setShowSketchfabHelper((value) => !value);
+  }, []);
 
   return (
     <header className="header">
@@ -79,6 +92,49 @@ export default function Header() {
             </span>
           </>
         )}
+
+        <div className="header__remote-loader" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 260 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="text"
+              value={remoteUrl}
+              onChange={(e) => setRemoteUrl(e.target.value)}
+              placeholder="Paste .glb URL or Sketchfab page"
+              style={{ flex: 1, padding: '8px 10px', borderRadius: 12, border: '1px solid rgba(148, 163, 184, 0.4)', background: '#ffffff', color: '#0f172a' }}
+            />
+            <button
+              className="btn btn--primary"
+              onClick={handleLoadRemote}
+              disabled={!remoteUrl.trim()}
+              title="Load remote model"
+            >
+              Load
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              className="btn btn--ghost"
+              onClick={toggleSketchfabHelper}
+              type="button"
+            >
+              Sketchfab helper
+            </button>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+              Load remote GLB here.
+            </span>
+          </div>
+          {showSketchfabHelper && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', background: '#f8fafc', borderRadius: 12, padding: 10, border: '1px solid rgba(148, 163, 184, 0.25)' }}>
+              <strong>Sketchfab helper:</strong>
+              <p style={{ margin: '6px 0 0' }}>
+                Sketchfab pages cannot be loaded directly. Export or download the model as a <code>.glb</code>, then paste the direct file URL here.
+              </p>
+              <p style={{ margin: '6px 0 0' }}>
+                If you host the file yourself, use that URL. Remote CORS-enabled GLB links work best.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

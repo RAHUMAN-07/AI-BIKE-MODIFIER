@@ -3,7 +3,7 @@ import { useBikeStore } from '../stores/bikeStore';
 import { STYLE_VARIANTS } from '../types';
 
 export default function StyleVariants() {
-  const { selectedPart, parts, applyStyle } = useBikeStore();
+  const { selectedPart, parts, applyStyle, applyRaceLivery } = useBikeStore();
   const [isGenerating, setIsGenerating] = useState(false);
 
   if (!selectedPart) return null;
@@ -23,6 +23,7 @@ export default function StyleVariants() {
     sporty: 'linear-gradient(135deg, #1e3a5f, #3b82f6, #06b6d4)',
     retro: 'linear-gradient(135deg, #92400e, #d97706, #fbbf24)',
     cafe: 'linear-gradient(135deg, #1a1a1a, #4a5568, #a0aec0)',
+    race: 'linear-gradient(135deg, #b91c1c, #f8fafc, #111827)',
     custom: 'linear-gradient(135deg, #5b21b6, #8b5cf6, #c084fc)',
   };
 
@@ -37,6 +38,14 @@ export default function StyleVariants() {
         <strong style={{ color: 'var(--text-primary)' }}>{part.displayName}</strong>.
         Each style modifies the part's shape and aesthetic.
       </div>
+
+      <button
+        className="btn btn--accent"
+        onClick={applyRaceLivery}
+        style={{ width: '100%', margin: '16px 0', justifyContent: 'center' }}
+      >
+        🏁 Apply Race Livery Preset
+      </button>
 
       <div className="style-variants__grid">
         {variants.map((variant) => (
@@ -55,7 +64,8 @@ export default function StyleVariants() {
               }}>
                 {variant.id === 'sporty' ? '🏎️' :
                  variant.id === 'retro' ? '🏍️' :
-                 variant.id === 'cafe' ? '☕' : '🎨'}
+                 variant.id === 'cafe' ? '☕' :
+                 variant.id === 'race' ? '🏁' : '🎨'}
               </div>
               {/* AI badge */}
               <div style={{

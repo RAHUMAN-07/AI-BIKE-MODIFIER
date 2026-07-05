@@ -28,52 +28,70 @@ interface BikeState {
   // UI
   activeTab: 'color' | 'style' | 'parts';
   showExport: boolean;
+  viewerMode: 'hd' | 'raw';
 
   // Actions
   setProcessingStage: (stage: ProcessingStage, progress?: number, message?: string) => void;
   setModelUrl: (url: string) => void;
   setUploadedImage: (url: string) => void;
-  initializeParts: (partIds: string[]) => void;
+  initializeParts: (partIds: string[], customColors?: Record<string, string> | null) => void;
+  setViewerMode: (mode: 'hd' | 'raw') => void;
   selectPart: (partId: string | null) => void;
   hoverPart: (partId: string | null) => void;
   applyColor: (partId: string, color: string) => void;
   applyMaterial: (partId: string, material: MaterialType) => void;
   applyStyle: (partId: string, styleId: string) => void;
+  applyRaceLivery: () => void;
   applyReplacement: (partId: string, replacementId: string) => void;
   undoLastModification: () => void;
   resetPart: (partId: string) => void;
   resetAll: () => void;
   setActiveTab: (tab: 'color' | 'style' | 'parts') => void;
   toggleExport: () => void;
+  loadRemoteModel: (url: string) => void;
+  loadDefaultModel: () => Promise<void>;
 }
 
 // Default colors for bike parts
 const DEFAULT_PART_COLORS: Record<string, string> = {
-  fuel_tank: '#dc2626',
-  fairing: '#1e40af',
-  seat: '#1a1a1a',
-  exhaust: '#c0c0c0',
-  handlebar: '#374151',
-  mirror_left: '#1a1a1a',
-  mirror_right: '#1a1a1a',
-  headlight: '#e5e7eb',
+  fuel_tank: '#c41e1e',
+  fairing: '#c41e1e',
+  seat: '#111827',
+  exhaust: '#a8a8a8',
+  handlebar: '#2a2a2e',
+  mirror_left: '#111827',
+  mirror_right: '#111827',
+  headlight: '#f0f4f8',
   taillight: '#dc2626',
-  front_wheel: '#1a1a1a',
-  rear_wheel: '#1a1a1a',
-  front_rim: '#c0c0c0',
-  rear_rim: '#c0c0c0',
-  mudguard_front: '#1e40af',
-  mudguard_rear: '#1e40af',
-  chain_cover: '#374151',
-  engine: '#6b7280',
+  front_wheel: '#111827',
+  rear_wheel: '#111827',
+  front_rim: '#c41e1e',
+  rear_rim: '#c41e1e',
+  winglet_left: '#1a1a1a',
+  winglet_right: '#1a1a1a',
+  mudguard_front: '#111827',
+  mudguard_rear: '#111827',
+  chain_cover: '#2a2a2e',
+  radiator: '#3a3a3a',
+  swingarm: '#2a2a2e',
+  subframe: '#1a1a1a',
+  footpeg_left: '#4b5563',
+  footpeg_right: '#4b5563',
+  air_intake: '#1a1a1a',
+  engine: '#3a3a3a',
   frame: '#1a1a1a',
+  rear_sprocket: '#c8a832',
+  chain: '#3a3a3a',
+  fork_guard_left: '#111827',
+  fork_guard_right: '#111827',
+  steering_damper: '#2a2a2e',
 };
 
 const DEFAULT_MATERIALS: Record<string, MaterialType> = {
   fuel_tank: 'gloss',
   fairing: 'gloss',
   seat: 'matte',
-  exhaust: 'chrome',
+  exhaust: 'metallic',
   handlebar: 'metallic',
   mirror_left: 'gloss',
   mirror_right: 'gloss',
@@ -83,26 +101,65 @@ const DEFAULT_MATERIALS: Record<string, MaterialType> = {
   rear_wheel: 'matte',
   front_rim: 'metallic',
   rear_rim: 'metallic',
-  mudguard_front: 'gloss',
-  mudguard_rear: 'gloss',
-  chain_cover: 'matte',
+  winglet_left: 'carbon',
+  winglet_right: 'carbon',
+  mudguard_front: 'carbon',
+  mudguard_rear: 'carbon',
+  chain_cover: 'carbon',
+  radiator: 'metallic',
+  swingarm: 'metallic',
+  subframe: 'matte',
+  footpeg_left: 'metallic',
+  footpeg_right: 'metallic',
+  air_intake: 'carbon',
   engine: 'metallic',
   frame: 'matte',
+  rear_sprocket: 'metallic',
+  chain: 'metallic',
+  fork_guard_left: 'carbon',
+  fork_guard_right: 'carbon',
+  steering_damper: 'metallic',
 };
+
+const DEFAULT_BIKE_PART_IDS = Object.keys(BIKE_PARTS);
+
+function createDefaultParts(partIds: string[], customColors: Record<string, string> | null = null) {
+  const parts: Record<string, PartState> = {};
+  for (const id of partIds) {
+    const def = BIKE_PARTS[id];
+    if (!def) continue;
+    const color = customColors?.[id] || DEFAULT_PART_COLORS[id] || '#6b7280';
+    const material = DEFAULT_MATERIALS[id] || 'gloss';
+    parts[id] = {
+      id,
+      name: id,
+      displayName: def.displayName,
+      icon: def.icon,
+      color,
+      materialType: material,
+      originalColor: color,
+      originalMaterialType: material,
+      styleVariant: null,
+      replacementPart: null,
+    };
+  }
+  return parts;
+}
 
 export const useBikeStore = create<BikeState>((set, get) => ({
   // Initial state
   processingStage: 'idle',
   processingProgress: 0,
-  processingMessage: '',
+  processingMessage: 'Upload your bike image to get started',
   modelUrl: null,
   uploadedImageUrl: null,
-  parts: {},
+  parts: createDefaultParts(DEFAULT_BIKE_PART_IDS),
   selectedPart: null,
   hoveredPart: null,
   modifications: [],
   activeTab: 'color',
   showExport: false,
+  viewerMode: 'hd',
 
   // Actions
   setProcessingStage: (stage, progress = 0, message = '') => 
@@ -110,14 +167,45 @@ export const useBikeStore = create<BikeState>((set, get) => ({
 
   setModelUrl: (url) => set({ modelUrl: url }),
 
+  loadRemoteModel: (url) => set({
+    modelUrl: url,
+    viewerMode: 'raw',
+    processingStage: 'ready',
+    processingProgress: 100,
+    processingMessage: 'Remote model ready',
+    selectedPart: null,
+  }),
+
+  loadDefaultModel: async () => {
+    try {
+      const { getDefaultModel } = await import('../services/api');
+      const data = await getDefaultModel();
+      if (data.status === 'ready' && data.modelUrl) {
+        set({
+          modelUrl: data.modelUrl,
+          viewerMode: 'raw',
+          processingStage: 'ready',
+          processingProgress: 100,
+          processingMessage: 'Default model ready',
+        });
+      } else {
+        // Fallback to demo if API returns not_found
+        set({ modelUrl: 'demo' });
+      }
+    } catch (error) {
+      console.error("Failed to load default model", error);
+      set({ modelUrl: 'demo' }); // fallback
+    }
+  },
+
   setUploadedImage: (url) => set({ uploadedImageUrl: url }),
 
-  initializeParts: (partIds) => {
+  initializeParts: (partIds, customColors = null) => {
     const parts: Record<string, PartState> = {};
     for (const id of partIds) {
       const def = BIKE_PARTS[id];
       if (def) {
-        const color = DEFAULT_PART_COLORS[id] || '#6b7280';
+        const color = customColors?.[id] || DEFAULT_PART_COLORS[id] || '#6b7280';
         const material = DEFAULT_MATERIALS[id] || 'gloss';
         parts[id] = {
           id,
@@ -135,6 +223,8 @@ export const useBikeStore = create<BikeState>((set, get) => ({
     }
     set({ parts });
   },
+
+  setViewerMode: (mode) => set({ viewerMode: mode }),
 
   selectPart: (partId) => set({ selectedPart: partId }),
 
@@ -207,6 +297,36 @@ export const useBikeStore = create<BikeState>((set, get) => ({
       },
       modifications: [...modifications, mod],
     });
+  },
+
+  applyRaceLivery: () => {
+    const { parts } = get();
+    const preset = {
+      fuel_tank: { color: '#ef4444', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      fairing: { color: '#ef4444', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      winglet_left: { color: '#f8fafc', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      winglet_right: { color: '#f8fafc', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      radiator: { color: '#111827', materialType: 'metallic' as MaterialType, styleVariant: 'race' },
+      air_intake: { color: '#111827', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      mudguard_front: { color: '#111827', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      mudguard_rear: { color: '#111827', materialType: 'gloss' as MaterialType, styleVariant: 'race' },
+      front_rim: { color: '#f8fafc', materialType: 'metallic' as MaterialType, styleVariant: 'race' },
+      rear_rim: { color: '#f8fafc', materialType: 'metallic' as MaterialType, styleVariant: 'race' },
+    };
+
+    const updatedParts: Record<string, PartState> = { ...parts };
+    Object.entries(preset).forEach(([id, values]) => {
+      const part = updatedParts[id];
+      if (!part) return;
+      updatedParts[id] = {
+        ...part,
+        color: values.color,
+        materialType: values.materialType,
+        styleVariant: values.styleVariant,
+      };
+    });
+
+    set({ parts: updatedParts });
   },
 
   applyReplacement: (partId, replacementId) => {

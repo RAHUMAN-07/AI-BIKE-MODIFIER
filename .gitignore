@@ -14,6 +14,13 @@ backend/venv/
 backend/storage/
 backend/dummy.jpg
 
+# ML model weights (large binary — download separately)
+*.pt
+*.onnx
+
+# Build artifacts
+frontend/tsconfig.tsbuildinfo
+
 # IDE
 .vscode/
 .idea/

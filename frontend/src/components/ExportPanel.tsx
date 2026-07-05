@@ -6,13 +6,41 @@ export default function ExportPanel() {
   const [exporting, setExporting] = useState<string | null>(null);
 
   const handleExport = useCallback((format: string) => {
+    if (format === 'png') {
+      // Real screenshot: grab the Three.js WebGL canvas and download it
+      const canvas = document.querySelector<HTMLCanvasElement>('.viewer-canvas canvas');
+      if (!canvas) {
+        alert('3D viewer not found. Make sure the bike is loaded first.');
+        return;
+      }
+      setExporting('png');
+      // Use requestAnimationFrame to ensure the frame has rendered
+      requestAnimationFrame(() => {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.download = `motoforge-build-${Date.now()}.png`;
+          link.href = dataUrl;
+          link.click();
+        } catch {
+          alert('Screenshot failed — try disabling browser security restrictions.');
+        } finally {
+          setExporting(null);
+        }
+      });
+      return;
+    }
+
     setExporting(format);
-    // Simulate export
+    // Simulate export for other formats
     setTimeout(() => {
       setExporting(null);
-      // In real implementation, this would trigger Three.js canvas capture
-      // or GLB file download
-      alert(`Export as ${format.toUpperCase()} — feature coming with backend integration!`);
+      const messages: Record<string, string> = {
+        mp4: '360° Video export — connect the rendering backend to generate turntable videos.',
+        glb: '3D GLB download — use the Raw AI Mesh mode and connect your API keys to generate a real mesh.',
+        share: 'Share Link — coming soon with backend session persistence.',
+      };
+      alert(messages[format] || `Export as ${format.toUpperCase()} — feature coming soon!`);
     }, 1500);
   }, []);
 

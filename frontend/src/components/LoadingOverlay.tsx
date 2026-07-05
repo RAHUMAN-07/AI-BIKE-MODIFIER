@@ -4,9 +4,9 @@ export default function LoadingOverlay() {
   const { processingStage, processingProgress, processingMessage } = useBikeStore();
 
   const stageLabels: Record<string, string> = {
-    uploading: '📤 Uploading',
-    reconstructing: '🔮 3D Reconstruction',
-    segmenting: '🧩 Part Segmentation',
+    uploading: 'Loading demo bike…',
+    reconstructing: 'Loading demo bike…',
+    segmenting: 'Loading demo bike…',
   };
 
   return (

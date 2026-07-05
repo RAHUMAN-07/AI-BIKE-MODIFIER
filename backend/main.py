@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import upload, reconstruct
+from routers import upload, reconstruct, parts, tripo
 import os
 
 app = FastAPI(title="MotoForge AI API", version="1.0.0")
@@ -24,6 +24,8 @@ app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 # Include routers
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
 app.include_router(reconstruct.router, prefix="/api", tags=["Reconstruct"])
+app.include_router(parts.router, prefix="/api", tags=["Parts"])
+app.include_router(tripo.router, prefix="/api", tags=["Tripo"])
 
 @app.get("/")
 def read_root():

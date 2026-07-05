@@ -1,13 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
 import { useBikeStore } from '../stores/bikeStore';
 import CaptureGuide from './CaptureGuide';
-import { uploadImage, startReconstruction, getReconstructionStatus } from '../services/api';
+import { uploadImage, startReconstruction, getReconstructionStatus, getSegmentationStatus, toBackendUrl } from '../services/api';
 
 const ALL_PARTS = [
   'fuel_tank', 'fairing', 'seat', 'exhaust', 'handlebar',
   'mirror_left', 'mirror_right', 'headlight', 'taillight',
   'front_wheel', 'rear_wheel', 'front_rim', 'rear_rim',
-  'mudguard_front', 'mudguard_rear', 'chain_cover', 'engine', 'frame'
+  'front_disc', 'rear_disc', 'front_caliper', 'rear_caliper',
+  'winglet_left', 'winglet_right',
+  'mudguard_front', 'mudguard_rear', 'chain_cover', 'engine', 'frame',
+  'radiator', 'air_intake', 'swingarm', 'subframe',
+  'footpeg_left', 'footpeg_right',
+  'rear_sprocket', 'chain', 'fork_guard_left', 'fork_guard_right', 'steering_damper',
 ];
 
 export default function UploadZone() {
@@ -47,21 +52,32 @@ export default function UploadZone() {
           setProcessingStage('reconstructing', 100, '3D mesh generated!');
           done = true;
 
-          // Stage 3: Segmenting (mocked for now, Phase 3)
+          // Stage 3: Segmenting
           await new Promise(r => setTimeout(r, 300));
-          setProcessingStage('segmenting', 0, 'Identifying motorcycle parts...');
-          
-          // Simulate segmentation steps
-          for (let i = 0; i < 5; i++) {
+          setProcessingStage('segmenting', 10, 'Requesting part segmentation...');
+          try {
+            const segStatus = await getSegmentationStatus(uploadResult.sessionId);
+            setProcessingStage('segmenting', 50, 'Identifying motorcycle parts...');
+            if (segStatus.parts && segStatus.parts.length > 0) {
+              setProcessingStage('segmenting', 90, `Detected ${segStatus.parts.length} parts...`);
+              await new Promise(r => setTimeout(r, 400));
+              initializeParts(segStatus.parts, segStatus.colors);
+            } else {
+              setProcessingStage('segmenting', 90, 'No parts detected, using default parts...');
+              await new Promise(r => setTimeout(r, 400));
+              initializeParts(ALL_PARTS, segStatus.colors);
+            }
+          } catch (segErr) {
+            console.error('Segmentation failed:', segErr);
+            setProcessingStage('segmenting', 90, 'Segmentation failed, falling back...');
             await new Promise(r => setTimeout(r, 400));
-            const partNames = ['fuel tank', 'fairing', 'seat', 'exhaust', 'wheels'];
-            setProcessingStage('segmenting', Math.min((i + 1) * 20, 99), `Labeling parts: ${partNames[i]}...`);
+            initializeParts(ALL_PARTS, null);
           }
-
-          initializeParts(ALL_PARTS);
           
           // Use real model URL if available, fallback to demo
-          const modelUrl = status.modelUrl || 'demo';
+          const modelUrl = status.modelUrl && status.modelUrl !== 'demo'
+            ? toBackendUrl(status.modelUrl)
+            : 'demo';
           setModelUrl(modelUrl);
           setProcessingStage('ready', 100, 'Your bike is ready to customize!');
 

@@ -1,3 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #8b5cf6;
+  --color-panel: #27272a;
+}
+
 /* ============================================================
    MotoForge AI — Design System
    Premium dark-mode motorcycle customization studio
@@ -1275,4 +1282,279 @@ body::before {
 @keyframes slideInUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+/* ---------- Studio Layout (Ready State) ---------- */
+.studio-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+  overflow: hidden;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.studio-layout:has(.studio-panel-wrapper) {
+  grid-template-columns: 220px 1fr 380px;
+}
+
+.studio-viewer-wrapper {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.studio-export-wrapper {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-dropdown);
+}
+
+.studio-panel-wrapper {
+  height: 100%;
+  overflow: hidden;
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* ---------- Parts List Sidebar ---------- */
+.parts-list-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
+  overflow: hidden;
+  padding: var(--space-4) var(--space-2);
+  gap: var(--space-2);
+}
+
+.parts-list-panel__title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.parts-list-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.parts-list-panel__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  position: relative;
+  width: 100%;
+}
+
+.parts-list-panel__item:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.parts-list-panel__item--active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+  color: var(--accent-blue);
+  border-color: var(--border-accent);
+}
+
+.parts-list-panel__item--race {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(248, 250, 252, 0.12));
+  color: var(--accent-red);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.parts-list-panel__item-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.parts-list-panel__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.parts-list-panel__item-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-violet);
+  flex-shrink: 0;
+}
+
+.parts-list-panel__color-strip {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle);
+  margin-top: var(--space-2);
+}
+
+/* ---------- Export Panel Overrides ---------- */
+.export-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.export-panel--expanded {
+  padding: var(--space-4);
+  background: var(--bg-glass-active);
+  backdrop-filter: blur(30px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.export-panel__title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-glass);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.export-option:hover {
+  border-color: var(--border-accent);
+  background: var(--bg-glass-hover);
+  transform: translateX(-2px);
+}
+
+.export-option__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.export-option__info {
+  flex: 1;
+}
+
+.export-option__name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.export-option__desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---------- Responsive for studio ---------- */
+@media (max-width: 1024px) {
+  .studio-layout {
+    grid-template-columns: 180px 1fr;
+  }
+
+  .studio-layout:has(.studio-panel-wrapper) {
+    grid-template-columns: 180px 1fr 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .studio-layout,
+  .studio-layout:has(.studio-panel-wrapper) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .parts-list-panel {
+    flex-direction: row;
+    height: auto;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .parts-list-panel__list {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .parts-list-panel__item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .studio-panel-wrapper {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .app-main--with-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .mod-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60vh;
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    z-index: var(--z-modal);
+    animation: slideInUp 0.4s ease-out;
+  }
+
+  .capture-guide {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .upload-zone__hero h1 {
+    font-size: var(--font-size-3xl);
+  }
+
+  .header__stage {
+    display: none;
+  }
 }
