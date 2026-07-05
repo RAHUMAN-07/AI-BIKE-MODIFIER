@@ -1,9 +1,11 @@
 import os
 import time
+import datetime
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from services.reconstruction import generate_3d_mesh
 from services.storage import STORAGE_PATH
+from database import get_sessions_collection
 
 router = APIRouter()
 
@@ -21,6 +23,7 @@ class ReconstructStatus(BaseModel):
     error: str | None = None
 
 def process_reconstruction(session_id: str):
+    """Background task to generate 3D model from uploaded image."""
     try:
         reconstruction_jobs[session_id] = {"status": "processing", "progress": 20}
         
@@ -45,8 +48,31 @@ def process_reconstruction(session_id: str):
         def update_progress(status, pct):
             reconstruction_jobs[session_id]["progress"] = pct
 
-        # Call AI API
+        # Call AI API to generate 3D model
         model_url = generate_3d_mesh(input_path, session_id, progress_callback=update_progress)
+        
+        # Update session in database with model URL
+        try:
+            sessions_col = get_sessions_collection()
+            if sessions_col is None:
+                raise Exception("No database collection available")
+            
+            update_data = {
+                "model_url": model_url,
+                "model_generated_at": datetime.datetime.utcnow(),
+                "status": "model_ready"
+            }
+            
+            if hasattr(sessions_col, 'document'):
+                # Firebase Firestore - update existing document
+                sessions_col.document(session_id).update(update_data)
+            else:
+                # MongoDB - update existing document
+                sessions_col.update_one({"session_id": session_id}, {"$set": update_data})
+                
+            print(f"✅ Model for session {session_id} saved to database")
+        except Exception as e:
+            print(f"⚠️ Failed to update session with model: {e}")
         
         reconstruction_jobs[session_id] = {
             "status": "complete",
@@ -110,3 +136,4 @@ async def reconstruct_part(request: dict):
         "resultUrl": mock_generated_url,
         "message": f"Successfully applied {selected_item} to {part_id}"
     }
+

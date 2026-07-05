@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBikeStore } from '../stores/bikeStore';
 import { CATALOG_PARTS } from '../types';
+import { suggestParts, type PartSuggestion } from '../services/api';
 
 const STYLE_FILTERS = [
   { id: 'all', label: 'All' },
@@ -13,6 +14,9 @@ const STYLE_FILTERS = [
 export default function PartsCatalog() {
   const { selectedPart, parts, applyReplacement } = useBikeStore();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [aiSuggestions, setAiSuggestions] = useState<PartSuggestion[] | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   if (!selectedPart) return null;
   const part = parts[selectedPart];
@@ -134,45 +138,101 @@ export default function PartsCatalog() {
         )}
       </div>
 
-      {/* AI Suggestions CTA */}
+      {/* AI Suggestions */}
       <div style={{
         marginTop: 'var(--space-4)',
         padding: 'var(--space-4)',
         borderRadius: 'var(--radius-lg)',
         background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1))',
         border: '1px solid rgba(139, 92, 246, 0.2)',
-        textAlign: 'center',
       }}>
-        <div style={{ 
-          fontSize: 'var(--font-size-sm)', 
-          fontWeight: 600,
-          marginBottom: 'var(--space-2)',
-          color: 'var(--text-primary)'
-        }}>
-          Can't find what you're looking for?
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+          <div>
+            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+              ✨ AI Part Suggestions
+            </div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+              Powered by backend catalog API
+            </div>
+          </div>
+          <button
+            className="btn btn--primary"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+              border: 'none',
+              color: 'white',
+              fontSize: 'var(--font-size-xs)',
+              padding: '6px 14px',
+            }}
+            disabled={isLoadingSuggestions}
+            onClick={async () => {
+              if (showSuggestions && aiSuggestions) {
+                setShowSuggestions(false);
+                return;
+              }
+              setIsLoadingSuggestions(true);
+              try {
+                const result = await suggestParts(selectedPart);
+                setAiSuggestions(result.suggestions);
+                setShowSuggestions(true);
+              } catch {
+                setAiSuggestions(null);
+                alert('Could not fetch suggestions. Is the backend running?');
+              } finally {
+                setIsLoadingSuggestions(false);
+              }
+            }}
+          >
+            {isLoadingSuggestions ? '⏳ Loading…' : showSuggestions ? 'Hide' : '🔍 Find Upgrades'}
+          </button>
         </div>
-        <div style={{ 
-          fontSize: 'var(--font-size-xs)', 
-          color: 'var(--text-tertiary)',
-          marginBottom: 'var(--space-3)',
-        }}>
-          Let AI analyze your bike and suggest perfect {part.displayName} matches.
-        </div>
-        <button 
-          className="btn btn--primary" 
-          style={{ 
-            width: '100%', 
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-            border: 'none',
-            color: 'white'
-          }}
-          onClick={() => {
-            alert('AI is analyzing your bike topology... (This would connect to an AI embedding search API in production)');
-          }}
-        >
-          ✨ AI Suggest Parts
-        </button>
+
+        {showSuggestions && aiSuggestions && aiSuggestions.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {aiSuggestions.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  padding: 'var(--space-3)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(139,92,246,0.15)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => applyReplacement(selectedPart, s.id)}
+              >
+                <div style={{ fontSize: '1.4rem' }}>{s.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>
+                    {s.brand} — {s.model}
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 'var(--radius-full)', background: 'rgba(139,92,246,0.2)', color: '#c084fc' }}>
+                      {s.style.toUpperCase()}
+                    </span>
+                    {s.compatible && (
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
+                        ✓ Compatible
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 700, color: '#a78bfa', fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+                  ${s.price}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showSuggestions && (!aiSuggestions || aiSuggestions.length === 0) && (
+          <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
+            No suggestions found for this part.
+          </div>
+        )}
       </div>
 
       {/* Order CTA */}

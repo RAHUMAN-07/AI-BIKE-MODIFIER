@@ -50,7 +50,6 @@ function Ground() {
         far={4}
         color="#0f172a"
       />
-      {/* Grid lines */}
       <gridHelper 
         args={[20, 40, '#cbd5e1', '#e2e8f0']} 
         position={[0, 0.01, 0]} 
@@ -81,14 +80,12 @@ function SceneLighting() {
         color="#6080ff"
       />
       <pointLight position={[0, 5, 0]} intensity={0.5} color="#e2e8f0" />
-      {/* Rim lights for soft bright effect */}
       <pointLight position={[-4, 2, 0]} intensity={0.6} color="#cbd5e1" distance={8} />
       <pointLight position={[4, 2, 0]} intensity={0.6} color="#f8fafc" distance={8} />
     </>
   );
 }
 
-// Camera preset buttons
 const CAMERA_PRESETS = [
   { label: '🎯 Front', position: [0, 1.5, 5] as [number, number, number] },
   { label: '👈 Left', position: [-5, 1.5, 0] as [number, number, number] },
@@ -98,7 +95,6 @@ const CAMERA_PRESETS = [
   { label: '🎬 3/4', position: [4, 2.5, 4] as [number, number, number] },
 ];
 
-// Internal R3F component that smoothly lerps the camera to a target position
 function CameraAnimator({ target }: { target: [number, number, number] | null }) {
   const { camera } = useThree();
   const targetRef = useRef<[number, number, number] | null>(null);
@@ -119,22 +115,112 @@ function CameraAnimator({ target }: { target: [number, number, number] | null })
   return null;
 }
 
+// ─── Interactive GLB Model with per-mesh highlighting ───
 function ReconstructedBike({ url }: { url: string }) {
   const { scene } = useGLTF(url);
-  
-  scene.traverse((node) => {
-    if ((node as THREE.Mesh).isMesh) {
-      node.castShadow = true;
-      node.receiveShadow = true;
+  const { selectedPart, hoveredPart, selectPart, hoverPart, parts } = useBikeStore();
+  const meshMaterialsRef = useRef<Map<string, THREE.MeshStandardMaterial>>(new Map());
+  const clonedScene = useRef(scene.clone(true)).current;
+
+  useEffect(() => {
+    clonedScene.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        if (!meshMaterialsRef.current.has(mesh.uuid)) {
+          const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          meshMaterialsRef.current.set(mesh.uuid, (mat as THREE.MeshStandardMaterial).clone());
+        }
+      }
+    });
+  }, [clonedScene]);
+
+  useEffect(() => {
+    clonedScene.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const originalMat = meshMaterialsRef.current.get(mesh.uuid);
+      if (!originalMat) return;
+
+      const meshName = mesh.name.toLowerCase();
+      let matchedPartId: string | null = null;
+      for (const partId of Object.keys(parts)) {
+        if (meshName.includes(partId) || meshName.includes(partId.replace('_', ''))) {
+          matchedPartId = partId;
+          break;
+        }
+      }
+
+      const newMat = originalMat.clone();
+      const partState = matchedPartId ? parts[matchedPartId] : null;
+
+      if (partState) {
+        newMat.color.set(partState.color);
+        switch (partState.materialType) {
+          case 'metallic': newMat.metalness = 0.9; newMat.roughness = 0.2; break;
+          case 'chrome':   newMat.metalness = 1.0; newMat.roughness = 0.05; break;
+          case 'matte':    newMat.metalness = 0.1; newMat.roughness = 0.9; break;
+          case 'carbon':   newMat.metalness = 0.3; newMat.roughness = 0.6; break;
+          default:         newMat.metalness = 0.2; newMat.roughness = 0.3; break;
+        }
+      }
+
+      if (matchedPartId && selectedPart === matchedPartId) {
+        newMat.emissive.set('#4f46e5');
+        newMat.emissiveIntensity = 0.5;
+      } else if (matchedPartId && hoveredPart === matchedPartId) {
+        newMat.emissive.set('#7c3aed');
+        newMat.emissiveIntensity = 0.3;
+      } else {
+        newMat.emissive.set('#000000');
+        newMat.emissiveIntensity = 0;
+      }
+
+      mesh.material = newMat;
+    });
+  }, [clonedScene, selectedPart, hoveredPart, parts]);
+
+  const handleClick = useCallback((e: any) => {
+    e.stopPropagation();
+    const meshName = (e.object as THREE.Mesh).name.toLowerCase();
+    for (const partId of Object.keys(parts)) {
+      if (meshName.includes(partId) || meshName.includes(partId.replace('_', ''))) {
+        selectPart(selectedPart === partId ? null : partId);
+        return;
+      }
     }
-  });
+    const firstId = Object.keys(parts)[0];
+    if (firstId) selectPart(firstId);
+  }, [parts, selectedPart, selectPart]);
+
+  const handlePointerOver = useCallback((e: any) => {
+    e.stopPropagation();
+    const meshName = (e.object as THREE.Mesh).name.toLowerCase();
+    for (const partId of Object.keys(parts)) {
+      if (meshName.includes(partId) || meshName.includes(partId.replace('_', ''))) {
+        hoverPart(partId);
+        document.body.style.cursor = 'pointer';
+        return;
+      }
+    }
+    document.body.style.cursor = 'default';
+  }, [parts, hoverPart]);
+
+  const handlePointerOut = useCallback(() => {
+    hoverPart(null);
+    document.body.style.cursor = 'default';
+  }, [hoverPart]);
 
   return (
-    <primitive 
-      object={scene} 
-      position={[0, 0.25, 0]} 
-      scale={2.4} 
-      rotation={[0, -Math.PI / 2, 0]} 
+    <primitive
+      object={clonedScene}
+      position={[0, 0.25, 0]}
+      scale={2.4}
+      rotation={[0, -Math.PI / 2, 0]}
+      onClick={handleClick}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
     />
   );
 }
@@ -146,17 +232,15 @@ export default function BikeViewer() {
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   const handlePointerMove = useCallback((e: React.MouseEvent) => {
-    if (hoveredPart) {
-      setTooltipPos({ x: e.clientX, y: e.clientY });
-    }
+    if (hoveredPart) setTooltipPos({ x: e.clientX, y: e.clientY });
   }, [hoveredPart]);
 
   const hoveredPartData = hoveredPart ? parts[hoveredPart] : null;
+  const isRealModel = modelUrl && modelUrl !== 'demo';
 
   return (
     <div className="viewer-container" onMouseMove={handlePointerMove}>
-      {/* 3D Mode Toggle Switch */}
-      {modelUrl && modelUrl !== 'demo' && (
+      {isRealModel && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 flex bg-slate-900/90 backdrop-blur-md p-1 rounded-full border border-slate-700/50 shadow-2xl">
           <button
             onClick={() => setViewerMode('hd')}
@@ -180,24 +264,26 @@ export default function BikeViewer() {
           </button>
         </div>
       )}
+
       <Canvas
         className="viewer-canvas"
         shadows
-        gl={{ 
-          antialias: true, 
+        gl={{
+          antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.2,
-          preserveDrawingBuffer: true,  // needed for PNG screenshot export
+          preserveDrawingBuffer: true,
         }}
         dpr={[1, 2]}
+        onPointerMissed={() => useBikeStore.getState().selectPart(null)}
       >
         <Suspense fallback={null}>
           <CameraRig />
           <CameraAnimator target={cameraTarget} />
           <SceneLighting />
           <Environment preset="studio" background={false} />
-          {viewerMode === 'raw' && modelUrl && modelUrl !== 'demo' ? (
-            <ReconstructedBike url={modelUrl} />
+          {viewerMode === 'raw' && isRealModel ? (
+            <ReconstructedBike url={modelUrl!} />
           ) : (
             <ProceduralBike />
           )}
@@ -205,31 +291,30 @@ export default function BikeViewer() {
         </Suspense>
       </Canvas>
 
-      {/* Part tooltip */}
       {hoveredPartData && tooltipPos && (
         <div
           className="part-tooltip"
-          style={{
-            left: tooltipPos.x,
-            top: tooltipPos.y - 10,
-          }}
+          style={{ left: tooltipPos.x, top: tooltipPos.y - 10 }}
         >
           {hoveredPartData.icon} {hoveredPartData.displayName}
         </div>
       )}
 
-      {/* Viewer info badges */}
       <div className="viewer-info">
         <div className="viewer-info__badge">
           <span className="viewer-info__dot" />
-          <span>Interactive 3D</span>
+          <span>{isRealModel ? 'TRELLIS AI Model' : 'Procedural 3D'}</span>
         </div>
         <div className="viewer-info__badge">
-          🏍️ {Object.keys(parts).length} parts detected
+          🏍️ {Object.keys(parts).length} parts
         </div>
+        {isRealModel && (
+          <div className="viewer-info__badge" style={{ color: '#10b981' }}>
+            ✅ Click parts to select
+          </div>
+        )}
       </div>
 
-      {/* Camera controls */}
       <div className="viewer-controls">
         {CAMERA_PRESETS.map((preset) => (
           <button
@@ -239,7 +324,6 @@ export default function BikeViewer() {
             onClick={() => {
               setCameraTarget(preset.position);
               setActivePreset(preset.label);
-              // Clear active state after animation completes
               setTimeout(() => setActivePreset(null), 1200);
             }}
           >

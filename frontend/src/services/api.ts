@@ -143,6 +143,31 @@ export function toBackendUrl(path: string): string {
   return `${BACKEND_BASE}${path}`;
 }
 
+// ---------- AI Part Suggestions ----------
+
+export interface PartSuggestion {
+  id: string;
+  brand: string;
+  model: string;
+  style: string;
+  price: number;
+  compatible: boolean;
+  icon: string;
+}
+
+export interface SuggestionsResponse {
+  part_id: string;
+  suggestions: PartSuggestion[];
+  total: number;
+  powered_by: string;
+}
+
+export async function suggestParts(partId: string, style = 'all'): Promise<SuggestionsResponse> {
+  const response = await fetch(`${API_BASE}/parts/${partId}/suggest?style=${style}`);
+  if (!response.ok) throw new Error('Failed to fetch part suggestions');
+  return response.json();
+}
+
 export default {
   uploadImage,
   startReconstruction,
@@ -151,5 +176,6 @@ export default {
   startSegmentation,
   getSegmentationStatus,
   generateModification,
+  suggestParts,
   toBackendUrl,
 };

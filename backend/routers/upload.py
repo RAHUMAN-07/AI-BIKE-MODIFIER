@@ -24,6 +24,10 @@ class UploadResponse(BaseModel):
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_image(file: UploadFile = File(...)):
+    """
+    Upload a bike image, remove background, and save to cloud storage.
+    Returns a session ID and the cloud URL of the processed image.
+    """
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -52,24 +56,42 @@ async def upload_image(file: UploadFile = File(...)):
             # Fallback to original image
             processed_path = original_path
 
-    # Upload to Supabase Storage
+    # Upload to Supabase Storage when configured, otherwise fall back to local URL.
     try:
         bucket_name = "motoforge-images"
         dest_path = f"uploads/{os.path.basename(processed_path)}"
         public_url = upload_file_to_storage(bucket_name, processed_path, dest_path)
     except Exception as e:
         print(f"Supabase upload failed: {e}")
-        # Fallback to local url for local dev if supabase fails
         public_url = f"/storage/uploads/{os.path.basename(processed_path)}"
 
-    # Save to MongoDB
-    sessions_col = get_sessions_collection()
-    sessions_col.insert_one({
-        "session_id": session_id,
-        "original_image_path": original_path,
-        "processed_image_url": public_url,
-        "created_at": datetime.datetime.utcnow(),
-    })
+    # Save to Firestore or MongoDB
+    try:
+        sessions_col = get_sessions_collection()
+        if sessions_col is None:
+            raise Exception("No database collection available")
+        
+        # Prepare session document
+        session_doc = {
+            "session_id": session_id,
+            "original_image_path": original_path,
+            "processed_image_url": public_url,
+            "created_at": datetime.datetime.utcnow(),
+            "status": "uploaded"
+        }
+        
+        # For Firestore (has add/set), for MongoDB (has insert_one)
+        if hasattr(sessions_col, 'document'):
+            # Firebase Firestore
+            sessions_col.document(session_id).set(session_doc)
+        else:
+            # MongoDB
+            sessions_col.insert_one(session_doc)
+            
+        print(f"✅ Session {session_id} saved to database")
+    except Exception as e:
+        print(f"⚠️ Failed to save session to database: {e}")
+        # Continue anyway - image is uploaded
 
     return {
         "sessionId": session_id,
@@ -83,7 +105,14 @@ async def detect_parts(session_id: str):
     and bounding boxes for the motorcycle parts.
     """
     sessions_col = get_sessions_collection()
-    session = sessions_col.find_one({"session_id": session_id})
+    
+    # Fetch session from database
+    if hasattr(sessions_col, 'document'):
+        # Firebase Firestore
+        session = sessions_col.document(session_id).get().to_dict()
+    else:
+        # MongoDB
+        session = sessions_col.find_one({"session_id": session_id})
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -98,4 +127,5 @@ async def detect_parts(session_id: str):
     except Exception as e:
         print(f"Error during part detection: {e}")
         raise HTTPException(status_code=500, detail=f"Part detection failed: {str(e)}")
+
 

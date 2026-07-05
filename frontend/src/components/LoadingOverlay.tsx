@@ -1,13 +1,21 @@
 import { useBikeStore } from '../stores/bikeStore';
 
+const STAGE_EMOJIS: Record<string, string> = {
+  uploading: '☁️',
+  reconstructing: '🤖',
+  segmenting: '🔍',
+};
+
 export default function LoadingOverlay() {
   const { processingStage, processingProgress, processingMessage } = useBikeStore();
 
   const stageLabels: Record<string, string> = {
-    uploading: 'Loading demo bike…',
-    reconstructing: 'Loading demo bike…',
-    segmenting: 'Loading demo bike…',
+    uploading: 'Uploading & Removing Background…',
+    reconstructing: 'TRELLIS AI — Generating 3D Model…',
+    segmenting: 'YOLOv8 — Detecting Bike Parts…',
   };
+
+  const emoji = STAGE_EMOJIS[processingStage] || '⚙️';
 
   return (
     <div className="loading-overlay">
@@ -18,8 +26,10 @@ export default function LoadingOverlay() {
           <div className="loading-spinner__ring" />
         </div>
 
+        <div style={{ fontSize: '2rem', margin: '8px 0 4px' }}>{emoji}</div>
+
         <div className="loading-overlay__stage">
-          {stageLabels[processingStage] || 'Processing...'}
+          {stageLabels[processingStage] || 'Processing…'}
         </div>
 
         <div className="loading-overlay__detail">
