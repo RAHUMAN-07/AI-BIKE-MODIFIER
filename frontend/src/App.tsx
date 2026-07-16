@@ -1,14 +1,16 @@
-import { useEffect } from 'react';
-import { useBikeStore } from './stores/bikeStore';
-import { BIKE_PARTS } from './types';
-import Header from './components/Header';
-import BikeViewer from './components/BikeViewer';
-import ModificationPanel from './components/ModificationPanel';
-import LoadingOverlay from './components/LoadingOverlay';
-import UploadZone from './components/UploadZone';
-import ExportPanel from './components/ExportPanel';
+import { useBikeStore } from './core/stores/bikeStore';
 
-// Parts list sidebar shown when bike is ready
+// Core UI Components
+import Header from './core/components/Header';
+import LoadingOverlay from './core/components/LoadingOverlay';
+import Login from './core/components/Login';
+
+// Feature UI Components
+import UploadZone from './features/upload/components/UploadZone';
+import BikeViewer from './features/viewer/components/BikeViewer';
+import ModificationPanel from './features/customization/components/ModificationPanel';
+import ExportPanel from './features/export/components/ExportPanel';
+
 function PartsListPanel() {
   const { parts, selectedPart, selectPart } = useBikeStore();
   const partEntries = Object.entries(parts);
@@ -35,7 +37,6 @@ function PartsListPanel() {
         ))}
       </div>
 
-      {/* Quick color preview strip for selected part */}
       {selectedPart && parts[selectedPart] && (
         <div className="parts-list-panel__color-strip">
           <div
@@ -57,13 +58,13 @@ function PartsListPanel() {
 }
 
 export default function App() {
-  const { processingStage, selectedPart, modelUrl, loadDefaultModel } = useBikeStore();
-
-  useEffect(() => {
-    loadDefaultModel();
-  }, [loadDefaultModel]);
+  const { currentPage, processingStage, selectedPart } = useBikeStore();
 
   const isLoading = processingStage !== 'ready' && processingStage !== 'idle';
+
+  if (currentPage === 'login') {
+    return <Login />;
+  }
 
   return (
     <div className="app-layout">
@@ -71,29 +72,28 @@ export default function App() {
 
       <main className="app-main">
         {isLoading && <LoadingOverlay />}
-        {processingStage === 'idle' && <UploadZone />}
 
-        <div className="studio-layout">
-          {/* Left: Parts list sidebar */}
-          <PartsListPanel />
+        {currentPage === 'upload' ? (
+          <UploadZone />
+        ) : (
+          <div className="studio-layout">
+            <PartsListPanel />
 
-          {/* Center: 3D viewer */}
-          <div className="studio-viewer-wrapper">
-            <BikeViewer />
+            <div className="studio-viewer-wrapper">
+              <BikeViewer />
 
-            {/* Export panel floating in top right */}
-            <div className="studio-export-wrapper">
-              <ExportPanel />
+              <div className="studio-export-wrapper">
+                <ExportPanel />
+              </div>
             </div>
+
+            {selectedPart && (
+              <div className="studio-panel-wrapper">
+                <ModificationPanel />
+              </div>
+            )}
           </div>
-
-          {/* Right: Modification panel (slides in when part is selected) */}
-          {selectedPart && (
-            <div className="studio-panel-wrapper">
-              <ModificationPanel />
-            </div>
-          )}
-        </div>
+        )}
       </main>
     </div>
   );

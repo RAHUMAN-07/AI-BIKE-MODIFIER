@@ -9,7 +9,6 @@ import {
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { useBikeStore } from '../stores/bikeStore';
-import ProceduralBike from './ProceduralBike';
 
 function CameraRig() {
   return (
@@ -109,6 +108,7 @@ function CameraAnimator({ target }: { target: [number, number, number] | null })
     camera.position.x += (tx - camera.position.x) * 0.08;
     camera.position.y += (ty - camera.position.y) * 0.08;
     camera.position.z += (tz - camera.position.z) * 0.08;
+
     camera.lookAt(0, 0.8, 0);
   });
 
@@ -226,7 +226,7 @@ function ReconstructedBike({ url }: { url: string }) {
 }
 
 export default function BikeViewer() {
-  const { modelUrl, hoveredPart, parts, viewerMode, setViewerMode } = useBikeStore();
+  const { modelUrl, hoveredPart, parts } = useBikeStore();
   const [cameraTarget, setCameraTarget] = useState<[number, number, number] | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -236,35 +236,9 @@ export default function BikeViewer() {
   }, [hoveredPart]);
 
   const hoveredPartData = hoveredPart ? parts[hoveredPart] : null;
-  const isRealModel = modelUrl && modelUrl !== 'demo';
 
   return (
     <div className="viewer-container" onMouseMove={handlePointerMove}>
-      {isRealModel && (
-        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 flex bg-slate-900/90 backdrop-blur-md p-1 rounded-full border border-slate-700/50 shadow-2xl">
-          <button
-            onClick={() => setViewerMode('hd')}
-            className={`px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
-              viewerMode === 'hd'
-                ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            ✨ HD Customizer
-          </button>
-          <button
-            onClick={() => setViewerMode('raw')}
-            className={`px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
-              viewerMode === 'raw'
-                ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            🤖 Raw AI Mesh
-          </button>
-        </div>
-      )}
-
       <Canvas
         className="viewer-canvas"
         shadows
@@ -282,11 +256,7 @@ export default function BikeViewer() {
           <CameraAnimator target={cameraTarget} />
           <SceneLighting />
           <Environment preset="studio" background={false} />
-          {viewerMode === 'raw' && isRealModel ? (
-            <ReconstructedBike url={modelUrl!} />
-          ) : (
-            <ProceduralBike />
-          )}
+          {modelUrl && <ReconstructedBike url={modelUrl} />}
           <Ground />
         </Suspense>
       </Canvas>
@@ -303,16 +273,14 @@ export default function BikeViewer() {
       <div className="viewer-info">
         <div className="viewer-info__badge">
           <span className="viewer-info__dot" />
-          <span>{isRealModel ? 'TRELLIS AI Model' : 'Procedural 3D'}</span>
+          <span>TRELLIS AI Model</span>
         </div>
         <div className="viewer-info__badge">
           🏍️ {Object.keys(parts).length} parts
         </div>
-        {isRealModel && (
-          <div className="viewer-info__badge" style={{ color: '#10b981' }}>
-            ✅ Click parts to select
-          </div>
-        )}
+        <div className="viewer-info__badge" style={{ color: '#10b981' }}>
+          ✅ Click parts to select
+        </div>
       </div>
 
       <div className="viewer-controls">

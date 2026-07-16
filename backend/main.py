@@ -1,32 +1,35 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import upload, reconstruct, parts, tripo
-import os
 
-app = FastAPI(title="MotoForge AI API", version="1.0.0")
+from features.upload.router import router as upload_router
+from features.reconstruction.router import router as reconstruct_router
+from features.customization.router import router as customization_router
 
-# CORS for frontend access
+app = FastAPI(title="MotoForge AI API", version="2.0.0")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve static files (uploads and models)
 STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage")
 os.makedirs(os.path.join(STORAGE_DIR, "uploads"), exist_ok=True)
 os.makedirs(os.path.join(STORAGE_DIR, "models"), exist_ok=True)
 app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 
-# Include routers
-app.include_router(upload.router, prefix="/api", tags=["Upload"])
-app.include_router(reconstruct.router, prefix="/api", tags=["Reconstruct"])
-app.include_router(parts.router, prefix="/api", tags=["Parts"])
-app.include_router(tripo.router, prefix="/api", tags=["Tripo"])
+app.include_router(upload_router, prefix="/api", tags=["Upload"])
+app.include_router(reconstruct_router, prefix="/api", tags=["Reconstruction & 3D AI"])
+app.include_router(customization_router, prefix="/api", tags=["Customization & Parts"])
 
 @app.get("/")
 def read_root():
-    return {"message": "MotoForge AI API is running"}
+    return {
+        "service": "MotoForge AI API",
+        "status": "online",
+        "architecture": "Feature-Based"
+    }

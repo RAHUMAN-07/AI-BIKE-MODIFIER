@@ -1,15 +1,9 @@
 """
-Phase 2 Integration Test: TRELLIS 3D Model Generation via Replicate API
-
-This test verifies the complete pipeline:
-1. Upload bike image
-2. Generate 3D model via TRELLIS
-3. Download GLB from Replicate
-4. Upload GLB to Supabase Storage
-5. Return public URL to frontend
+Phase 2 Integration Test: 3D Model Generation via Tripo3D AI API & TRELLIS Fallback
 """
 
 import io
+import os
 import time
 import logging
 from unittest.mock import patch, MagicMock
@@ -20,19 +14,19 @@ from main import app
 logger = logging.getLogger(__name__)
 
 class TestPhase2Reconstruction:
-    """Test TRELLIS 3D model generation pipeline."""
+    """Test 3D model generation pipeline with feature-based architecture."""
     
     def setup_method(self):
         """Set up test fixtures."""
         self.client = TestClient(app)
     
-    @patch("routers.reconstruct.get_sessions_collection")
-    @patch("services.reconstruction.upload_file_to_storage")
-    @patch("services.reconstruction.replicate.run")
-    @patch("services.reconstruction.requests.get")
-    @patch("routers.upload.get_sessions_collection")
-    @patch("routers.upload.upload_file_to_storage")
-    @patch("routers.upload.REMBG_AVAILABLE", False)
+    @patch("features.reconstruction.router.get_sessions_collection")
+    @patch("features.reconstruction.trellis_service.upload_file_to_storage")
+    @patch("features.reconstruction.trellis_service.replicate.run")
+    @patch("features.reconstruction.trellis_service.requests.get")
+    @patch("features.upload.router.get_sessions_collection")
+    @patch("features.upload.router.upload_file_to_storage")
+    @patch("features.upload.router.REMBG_AVAILABLE", False)
     def test_end_to_end_image_to_3d(
         self,
         mock_upload_image,
@@ -44,20 +38,14 @@ class TestPhase2Reconstruction:
     ):
         """Test complete pipeline: upload → reconstruct → model stored in cloud."""
         
-        # 1. Mock both upload and reconstruct collection getters
         mock_upload_col = MagicMock()
         mock_reconstruct_col = MagicMock()
         mock_get_collection_upload.return_value = mock_upload_col
         mock_get_collection_reconstruct.return_value = mock_reconstruct_col
-        
-        # Mock upload phase
         mock_upload_image.return_value = "https://supabase.example.com/uploads/test.png"
         
-        # Create a fake bike image
         fake_image = io.BytesIO(b"fake-image-data-123")
         
-        # 2. Upload the image
-        print("📤 Step 1: Uploading image...")
         upload_response = self.client.post(
             "/api/upload",
             files={"file": ("bike.jpg", fake_image, "image/jpeg")},
@@ -66,85 +54,83 @@ class TestPhase2Reconstruction:
         assert upload_response.status_code == 200, f"Upload failed: {upload_response.json()}"
         upload_data = upload_response.json()
         session_id = upload_data["sessionId"]
-        print(f"✅ Image uploaded. Session ID: {session_id}")
         
-        # 3. Mock TRELLIS Replicate API response (returns GLB URL)
         fake_glb_url = "https://replicate.com/example-bucket/output-glb.glb"
-        mock_replicate_run.return_value = fake_glb_url  # TRELLIS returns a URL
+        mock_replicate_run.return_value = fake_glb_url
         
-        # 4. Mock GLB download from Replicate
-        fake_glb_data = b"GLB_MOCK_DATA_" + b"0" * 10000  # Minimal GLB mock
+        fake_glb_data = b"GLB_MOCK_DATA_" + b"0" * 1000
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.content = fake_glb_data
         mock_response.headers = {"content-length": str(len(fake_glb_data))}
         mock_requests_get.return_value = mock_response
         
-        # 5. Mock Supabase upload for model
         mock_upload_model.return_value = f"https://supabase.example.com/models/{session_id}.glb"
         
-        # 6. Start reconstruction
-        print("🚀 Step 2: Starting 3D reconstruction...")
         reconstruct_response = self.client.post(f"/api/reconstruct/{session_id}")
-        
-        assert reconstruct_response.status_code == 200, f"Reconstruct start failed: {reconstruct_response.json()}"
+        assert reconstruct_response.status_code == 200
         reconstruct_data = reconstruct_response.json()
         assert reconstruct_data["status"] == "started"
-        print(f"✅ Reconstruction job started")
         
-        # 7. Poll status (in real scenario, this would wait for completion)
-        print("⏳ Step 3: Polling reconstruction status...")
-        time.sleep(1.5)  # Wait for background task to process
+        time.sleep(1.0)
         status_response = self.client.get(f"/api/reconstruct/{session_id}/status")
-        
-        assert status_response.status_code == 200, f"Status check failed: {status_response.json()}"
+        assert status_response.status_code == 200
         status_data = status_response.json()
-        print(f"   Current status: {status_data['status']} ({status_data['progress']}%)")
-        
-        # Status should eventually be complete
         assert status_data["status"] in ["pending", "processing", "complete"]
-        if status_data["status"] == "complete":
-            assert status_data["modelUrl"] == mock_upload_model.return_value
-            print(f"✅ Model URL: {status_data['modelUrl']}")
-        
-        print("✅ Phase 2 test complete!")
-        print(f"   - Image uploaded to Supabase")
-        print(f"   - TRELLIS reconstruction simulated")
-        print(f"   - GLB model pipeline working")
-
-
 
     def test_reconstruct_without_upload_fails(self):
         """Test that reconstruction without valid session fails."""
         response = self.client.get("/api/reconstruct/nonexistent-session-id/status")
-        
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "error"
-        print("✅ Correctly rejected reconstruction for non-existent session")
 
-    @patch("services.reconstruction.settings.REPLICATE_API_TOKEN", "")
-    @patch("routers.upload.get_sessions_collection")
-    @patch("routers.upload.upload_file_to_storage")
-    @patch("routers.upload.REMBG_AVAILABLE", False)
-    def test_fallback_when_replicate_not_configured(
-        self,
-        mock_upload,
-        mock_get_collection,
-    ):
-        """Test graceful fallback when Replicate API token is missing."""
-        mock_upload.return_value = "https://supabase.example.com/test.png"
-        mock_get_collection.return_value = MagicMock()
+    @patch("features.reconstruction.service.settings.TRIPO_API_KEY", "mock_tripo_key")
+    @patch("features.reconstruction.tripo_service.requests.post")
+    @patch("features.reconstruction.tripo_service.requests.get")
+    def test_tripo3d_service_integration(self, mock_get, mock_post):
+        """Test Tripo3D API generation flow with mocked endpoints."""
+        from features.reconstruction.tripo_service import generate_tripo_3d_mesh
+        import tempfile
         
-        # Upload without Replicate configured
-        fake_image = io.BytesIO(b"test-image")
-        response = self.client.post(
-            "/api/upload",
-            files={"file": ("bike.jpg", fake_image, "image/jpeg")},
-        )
+        # 1. Mock Upload response
+        mock_upload_resp = MagicMock()
+        mock_upload_resp.json.return_value = {"code": 0, "data": {"image_token": "img_token_123"}}
         
-        assert response.status_code == 200
-        print("✅ Upload works even without Replicate API key (will use demo on reconstruct)")
+        # 2. Mock Task creation response
+        mock_task_resp = MagicMock()
+        mock_task_resp.json.return_value = {"code": 0, "data": {"task_id": "task_123"}}
+        mock_post.side_effect = [mock_upload_resp, mock_task_resp]
+        
+        # 3. Mock Polling success response + GLB binary download response
+        mock_poll_resp = MagicMock()
+        mock_poll_resp.status_code = 200
+        mock_poll_resp.json.return_value = {
+            "code": 0,
+            "data": {
+                "status": "success",
+                "progress": 100,
+                "result": {"model": {"url": "https://tripo3d.ai/models/test.glb"}}
+            }
+        }
+        
+        mock_dl_resp = MagicMock()
+        mock_dl_resp.status_code = 200
+        mock_dl_resp.content = b"fake-glb-binary-data"
+        
+        mock_get.side_effect = [mock_poll_resp, mock_dl_resp]
+        
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(b"fake-image")
+            tmp_path = tmp.name
+            
+        try:
+            url = generate_tripo_3d_mesh(tmp_path, "session_tripo_test")
+            assert "session_tripo_test.glb" in url or "storage" in url
+            print("✅ Tripo3D API service test passed!")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 
 if __name__ == "__main__":

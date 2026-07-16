@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
-import { useBikeStore } from '../stores/bikeStore';
+import { useBikeStore } from '../../../core/stores/bikeStore';
 import CaptureGuide from './CaptureGuide';
-import { uploadImage, startReconstruction, getReconstructionStatus, getSegmentationStatus, toBackendUrl } from '../services/api';
+import { uploadImage, startReconstruction, getReconstructionStatus, getSegmentationStatus, toBackendUrl } from '../../../core/services/api';
 
 const ALL_PARTS = [
   'fuel_tank', 'fairing', 'seat', 'exhaust', 'handlebar',
@@ -22,7 +22,6 @@ export default function UploadZone() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // === Real upload + backend reconstruction ===
   const handleFile = useCallback((file: File) => {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
     if (!validTypes.includes(file.type)) {
@@ -41,27 +40,23 @@ export default function UploadZone() {
     setUploadedImage(previewUrl);
 
     try {
-      // Stage 1: Uploading to backend
       setProcessingStage('uploading', 10, 'Uploading your motorcycle photo...');
       const uploadResult = await uploadImage(selectedFile);
       setProcessingStage('uploading', 100, 'Upload complete!');
 
-      // Stage 2: Trigger 3D Reconstruction
-      await new Promise(r => setTimeout(r, 400)); // brief pause for UX
-      setProcessingStage('reconstructing', 5, 'Starting 3D reconstruction...');
+      await new Promise(r => setTimeout(r, 400));
+      setProcessingStage('reconstructing', 5, 'Starting Tripo3D AI 3D reconstruction...');
       await startReconstruction(uploadResult.sessionId);
 
-      // Poll reconstruction status
       let done = false;
       while (!done) {
         await new Promise(r => setTimeout(r, 1500));
         const status = await getReconstructionStatus(uploadResult.sessionId);
 
         if (status.status === 'complete') {
-          setProcessingStage('reconstructing', 100, '3D mesh generated!');
+          setProcessingStage('reconstructing', 100, '3D model generated!');
           done = true;
 
-          // Stage 3: Segmenting
           await new Promise(r => setTimeout(r, 300));
           setProcessingStage('segmenting', 10, 'Requesting part segmentation...');
           try {
@@ -85,7 +80,7 @@ export default function UploadZone() {
           
           if (status.modelUrl) {
             setModelUrl(toBackendUrl(status.modelUrl));
-            setProcessingStage('ready', 100, 'Your bike is ready to customize!');
+            setProcessingStage('ready', 100, 'Your 3D bike model is ready to customize!');
             setCurrentPage('viewer');
           } else {
             throw new Error('Reconstruction succeeded but did not return a valid model.');
@@ -98,17 +93,16 @@ export default function UploadZone() {
           done = true;
 
         } else {
-          // Still processing
           setProcessingStage('reconstructing', Math.min(status.progress || 30, 95),
-            status.progress < 30 ? 'Extracting depth map...' :
-            status.progress < 60 ? 'Generating 3D mesh...' :
-            'Applying textures...');
+            status.progress < 30 ? 'Uploading to Tripo3D AI...' :
+            status.progress < 60 ? 'Generating 3D GLB mesh...' :
+            'Applying materials & textures...');
         }
       }
     } catch (err) {
       console.error('Pipeline error:', err);
       setProcessingStage('idle', 0, 'Upload failed');
-      alert('AI pipeline failed. Please ensure the FastAPI backend is running and cloud services (Supabase/MongoDB) are correctly configured.');
+      alert('AI pipeline failed. Please ensure the backend is running.');
     }
   }, [selectedFile, previewUrl, setUploadedImage, setProcessingStage, initializeParts, setModelUrl]);
 
@@ -141,10 +135,9 @@ export default function UploadZone() {
     <div className="upload-zone">
       <div className="upload-zone__content" style={{ animation: 'fadeInUp 0.8s ease-out' }}>
         <div className="upload-zone__hero">
-          <h1>Transform Your Ride</h1>
+          <h1>Transform Your Ride in 3D</h1>
           <p>
-            Upload a photo of your motorcycle and watch AI reconstruct it in 3D. 
-            Then tap any part to customize colors, styles, and aftermarket upgrades.
+            Upload a photo of your motorcycle and watch Tripo3D AI convert it into an interactive 3D model.
           </p>
         </div>
 
@@ -169,8 +162,6 @@ export default function UploadZone() {
                 <span className="upload-dropzone__format-tag">JPG</span>
                 <span className="upload-dropzone__format-tag">PNG</span>
                 <span className="upload-dropzone__format-tag">WEBP</span>
-                <span className="upload-dropzone__format-tag">MP4</span>
-                <span className="upload-dropzone__format-tag">MOV</span>
               </div>
             </div>
 

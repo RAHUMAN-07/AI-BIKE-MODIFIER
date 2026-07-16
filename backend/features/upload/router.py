@@ -1,13 +1,14 @@
 import os
 import io
 import datetime
-from fastapi import APIRouter, File, UploadFile, HTTPException
-from services.storage import save_upload_file, STORAGE_PATH
-from services.object_detection import detect_parts as run_detect_parts
-from services.supabase_storage import upload_file_to_storage
-from database import get_sessions_collection
-from pydantic import BaseModel
 import uuid
+from fastapi import APIRouter, File, UploadFile, HTTPException
+from pydantic import BaseModel
+
+from core.storage.local_storage import save_upload_file, STORAGE_PATH
+from core.storage.supabase_storage import upload_file_to_storage
+from core.database import get_sessions_collection, IS_FIREBASE
+from features.detection.service import detect_parts as run_detect_parts
 
 try:
     from rembg import remove
@@ -31,32 +32,24 @@ async def upload_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    # Generate session ID
     session_id = str(uuid.uuid4())
-    
-    # Save original locally (temporarily)
     _, original_path = save_upload_file(file, "uploads", session_id)
-    
     processed_path = original_path
-    
-    # Remove background if rembg is available
+
     if REMBG_AVAILABLE:
         try:
             with open(original_path, "rb") as i:
                 input_bg_bytes = i.read()
             output_bg_bytes = remove(input_bg_bytes)
             
-            # Save processed image locally
             processed_filename = f"{session_id}_nobg.png"
             processed_path = os.path.join(STORAGE_PATH, "uploads", processed_filename)
             with open(processed_path, "wb") as o:
                 o.write(output_bg_bytes)
         except Exception as e:
             print(f"Background removal failed: {e}")
-            # Fallback to original image
             processed_path = original_path
 
-    # Upload to Supabase Storage when configured, otherwise fall back to local URL.
     try:
         bucket_name = "motoforge-images"
         dest_path = f"uploads/{os.path.basename(processed_path)}"
@@ -65,13 +58,11 @@ async def upload_image(file: UploadFile = File(...)):
         print(f"Supabase upload failed: {e}")
         public_url = f"/storage/uploads/{os.path.basename(processed_path)}"
 
-    # Save to Firestore or MongoDB
     try:
         sessions_col = get_sessions_collection()
         if sessions_col is None:
             raise Exception("No database collection available")
         
-        # Prepare session document
         session_doc = {
             "session_id": session_id,
             "original_image_path": original_path,
@@ -80,18 +71,14 @@ async def upload_image(file: UploadFile = File(...)):
             "status": "uploaded"
         }
         
-        # For Firestore (has add/set), for MongoDB (has insert_one)
-        if hasattr(sessions_col, 'document'):
-            # Firebase Firestore
+        if IS_FIREBASE:
             sessions_col.document(session_id).set(session_doc)
         else:
-            # MongoDB
             sessions_col.insert_one(session_doc)
             
         print(f"✅ Session {session_id} saved to database")
     except Exception as e:
         print(f"⚠️ Failed to save session to database: {e}")
-        # Continue anyway - image is uploaded
 
     return {
         "sessionId": session_id,
@@ -107,9 +94,8 @@ async def detect_parts(session_id: str):
     sessions_col = get_sessions_collection()
     session = None
     
-    # Fetch session from database
     try:
-        if sessions_col is not None and hasattr(sessions_col, 'document'):
+        if sessions_col is not None and IS_FIREBASE:
             doc = sessions_col.document(session_id).get()
             session = doc.to_dict() if doc.exists else None
         elif sessions_col is not None:
@@ -119,7 +105,6 @@ async def detect_parts(session_id: str):
         
     original_path = session.get("original_image_path") if session else None
     if not original_path or not os.path.exists(original_path):
-        # Local fallback lookup
         uploads_dir = os.path.join(STORAGE_PATH, "uploads")
         if os.path.exists(uploads_dir):
             for f in os.listdir(uploads_dir):
@@ -136,5 +121,3 @@ async def detect_parts(session_id: str):
     except Exception as e:
         print(f"Error during part detection: {e}")
         raise HTTPException(status_code=500, detail=f"Part detection failed: {str(e)}")
-
-
