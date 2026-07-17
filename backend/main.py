@@ -36,7 +36,7 @@ app.include_router(upload_router, prefix="/api", tags=["Upload"])
 app.include_router(reconstruct_router, prefix="/api", tags=["Reconstruction & 3D AI"])
 app.include_router(customization_router, prefix="/api", tags=["Customization & Parts"])
 
-@app.get("/")
+@app.get("/api/health")
 def read_root():
     return {
         "service": "MotoForge AI API",
