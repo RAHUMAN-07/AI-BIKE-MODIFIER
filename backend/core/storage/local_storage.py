@@ -5,8 +5,10 @@ from fastapi import UploadFile
 from core.config import settings
 
 _backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-STORAGE_PATH = os.path.join(_backend_root, settings.STORAGE_DIR)
-STORAGE_PATH = os.path.abspath(STORAGE_PATH)
+if os.path.isabs(settings.STORAGE_DIR):
+    STORAGE_PATH = settings.STORAGE_DIR
+else:
+    STORAGE_PATH = os.path.abspath(os.path.join(_backend_root, settings.STORAGE_DIR))
 
 def save_upload_file(upload_file: UploadFile, subfolder: str = "uploads", session_id: str | None = None) -> tuple[str, str]:
     """Save an uploaded file to local storage and return (session_id, file_path)."""

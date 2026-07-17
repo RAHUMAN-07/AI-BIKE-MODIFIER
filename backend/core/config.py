@@ -26,7 +26,14 @@ class Settings:
 
 settings = Settings()
 
-# Ensure storage directories exist relative to backend directory
 _backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-os.makedirs(os.path.join(_backend_root, settings.STORAGE_DIR, "uploads"), exist_ok=True)
-os.makedirs(os.path.join(_backend_root, settings.STORAGE_DIR, "models"), exist_ok=True)
+try:
+    os.makedirs(os.path.join(_backend_root, settings.STORAGE_DIR, "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(_backend_root, settings.STORAGE_DIR, "models"), exist_ok=True)
+except OSError:
+    settings.STORAGE_DIR = "/tmp/storage"
+    try:
+        os.makedirs(os.path.join("/tmp/storage", "uploads"), exist_ok=True)
+        os.makedirs(os.path.join("/tmp/storage", "models"), exist_ok=True)
+    except Exception as e:
+        print(f"Warning: could not create storage directories: {e}")

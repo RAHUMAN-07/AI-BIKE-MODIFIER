@@ -18,9 +18,19 @@ app.add_middleware(
 )
 
 STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage")
-os.makedirs(os.path.join(STORAGE_DIR, "uploads"), exist_ok=True)
-os.makedirs(os.path.join(STORAGE_DIR, "models"), exist_ok=True)
-app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
+try:
+    os.makedirs(os.path.join(STORAGE_DIR, "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(STORAGE_DIR, "models"), exist_ok=True)
+except OSError:
+    STORAGE_DIR = "/tmp/storage"
+    try:
+        os.makedirs(os.path.join(STORAGE_DIR, "uploads"), exist_ok=True)
+        os.makedirs(os.path.join(STORAGE_DIR, "models"), exist_ok=True)
+    except Exception as e:
+        print(f"Warning: could not create storage directories: {e}")
+
+if os.path.exists(STORAGE_DIR):
+    app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 
 app.include_router(upload_router, prefix="/api", tags=["Upload"])
 app.include_router(reconstruct_router, prefix="/api", tags=["Reconstruction & 3D AI"])
