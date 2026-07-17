@@ -3,17 +3,24 @@
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/server.py": {
-      "includeFiles": "backend/**"
+      "includeFiles": "{frontend/dist/**,backend/**}"
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/server.py"
+      "src": "/api/(.*)",
+      "dest": "api/server.py"
     },
     {
-      "source": "/storage/(.*)",
-      "destination": "/api/server.py"
+      "src": "/storage/(.*)",
+      "dest": "api/server.py"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
