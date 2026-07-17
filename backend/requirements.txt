@@ -7,11 +7,8 @@ replicate>=0.26.0
 python-dotenv>=1.0.1
 Pillow>=10.3.0
 requests>=2.31.0
-ultralytics>=8.0.0
 pymongo>=4.6.0
 supabase>=2.3.4
-rembg[cpu]>=2.0.50
-onnxruntime>=1.16.0
 firebase-admin>=6.4.0
 gunicorn>=21.2.0
 
